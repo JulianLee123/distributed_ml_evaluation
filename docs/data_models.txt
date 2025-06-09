@@ -1,0 +1,29 @@
+Mongodb: 
+- Models collection: composite unique index of “model_name” “version”
+    - _id: ObjectId
+    - model_name: str
+    - version: str
+    - timestamp: datetime
+    - output_type: str
+    - size (bytes): long  
+- Datasets collection: composite unique index of “dataset_name” “version” 
+    - _id: ObjectId
+    - dataset_name: str
+    - version: str
+    - timestamp: datetime
+    - num_entries: 
+    - size (bytes): long  
+- Evaluations collection: composite unique index of “model_name”, “model_version”, “dataset_name”, “dataset_version” 
+    - _id: ObjectId 
+    - model_name: str
+    - model_version: str
+    - dataset_name: str
+    - dataset_version: str
+    - evaluations: [arr w/ 1 entry per type of evaluation]
+
+
+S3: pathing based on ids of mongodb objects
+- /Models
+- /Datasets
+- /Predictions   (store model predictions so we can run future evaluations on new metrics)
+- /Evaluations   (evaluations with plots or extensive data can reference S3)

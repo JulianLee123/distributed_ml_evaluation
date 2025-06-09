@@ -1,0 +1,13 @@
+I’ll be using Ray for the model serving service to parallelize machine learning inference. I’m opting for Ray Core since this is an effective means of handling batch data and allows for low-level control over how the workload is parallelized as a future extension. The goal of the project is focused on model serving instead of complex and huge datasets, which justifies the use of Ray Core over Ray Data. In the future, if the project extends to deploying the model in production with a stream of queries, then it could also incorporate Ray Serve. 
+
+Starting with preprocessing and result aggregation as relatively lightweight —> not incorporating parallelization yet (and result aggregation also may be I/O bound w/ database access)
+
+Want to eventaully upgrade the communication btw the task scheduler and model serving service to a Kafka messaging queue instead of HTTP so that the services can communicate ascynchrnously and to allow for higher throughput of messages and fault tolerance (since messages in the queue are persistent)
+
+I will be storing models and evaluation datasets on the cloud (S3) since these are likely to be large objects in real-world workflows, models are unstructured, and the cloud offers a simple, low cost solution to storage.
+
+MongoDB over PostgresSql for results and storing datasets/models because this project in its current form will not require advanced querying, and a document-oriented design is likely beneficial in querying results, which will be relatively unstructured data depending on what types of evaluation objectives are necessary for each model 
+
+(don’t do until a later version: overkill for now) —> Model serving service and results aggregation service communication: instead of having the model serving service /predict endpoint return a list of predictions, it can store the predictions in s3 and return the location of these predictiosn to the results aggregation service. This reduces network bandwidth usage, and it means that future iterations could retry parts of the model evaluation since data is persistent in s3. Though this is slower than direct transmission, the model predictions could beocme quite large, especially if the output isn’t numeric (e.g. for generative models), which justifies this method.  
+
+There are utilities like S3 access that are shared across microservices. I used volume mounting to include shared utilities in each service image. This allows for fast development, and for deployment, I’m planning to switch to build time copying for reproducability. 
