@@ -1,0 +1,20 @@
+{
+    "unique_index": [
+        [
+            "model_name",
+            1
+        ],
+        [
+            "model_version",
+            1
+        ],
+        [
+            "dataset_name",
+            1
+        ],
+        [
+            "dataset_version",
+            1
+        ]
+    ]
+}

@@ -1,0 +1,32 @@
+{
+    "bsonType": "object",
+    "required": [
+        "model_name",
+        "model_version",
+        "dataset_name",
+        "dataset_version",
+        "evaluations",
+        "created_by"
+    ],
+    "properties": {
+        "model_name": {
+            "bsonType": "string"
+        },
+        "model_version": {
+            "bsonType": "string"
+        },
+        "dataset_name": {
+            "bsonType": "string"
+        },
+        "dataset_version": {
+            "bsonType": "string"
+        },
+        "evaluations": {
+            "bsonType": "array"
+        },
+        "created_by": {
+            "bsonType": "string"
+        }
+    },
+    "additionalProperties": false
+}
