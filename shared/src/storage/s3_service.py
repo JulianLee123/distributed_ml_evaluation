@@ -14,7 +14,7 @@ class S3ServiceError(Exception):
     pass
 
 class S3Service:
-    def __init__(self, **kwargs):
+    def __init__(self, is_testing: bool = False, **kwargs):
         """Initialize S3 service with config from kwargs or environment variables."""
         self.config = {
             'aws_access_key_id': kwargs.get('aws_access_key_id') or os.getenv('AWS_ACCESS_KEY_ID'),
@@ -27,6 +27,11 @@ class S3Service:
         if missing:
             raise S3ServiceError(f"Missing config: {', '.join(missing)}")
         
+        if is_testing:
+            self.path_prefix = "test/"
+        else:
+            self.path_prefix = ""
+
         self._connect()
 
     def _connect(self):
@@ -54,6 +59,7 @@ class S3Service:
     def download_file(self, s3_key: str, local_path: str = None) -> str:
         """Download file from S3 to local filesystem or temp file."""
         try:
+            s3_key = self.path_prefix + s3_key
             if not local_path:
                 suffix = Path(s3_key).suffix
                 temp_file = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
@@ -75,6 +81,7 @@ class S3Service:
     def upload_file(self, local_path: str, s3_key: str, metadata: Dict[str, str] = None) -> None:
         """Upload file to S3 with optional metadata."""
         try:
+            s3_key = self.path_prefix + s3_key
             if not os.path.exists(local_path):
                 raise S3ServiceError(f"File not found: {local_path}")
             
@@ -90,6 +97,7 @@ class S3Service:
     def delete_file(self, s3_key: str) -> None:
         """Delete file from S3."""
         try:
+            s3_key = self.path_prefix + s3_key
             self.client.delete_object(Bucket=self.bucket, Key=s3_key)
         except ClientError as e:
             raise S3ServiceError(f"Delete failed: {str(e)}")
@@ -97,6 +105,7 @@ class S3Service:
     def file_exists(self, s3_key: str) -> bool:
         """Check if file exists in S3."""
         try:
+            s3_key = self.path_prefix + s3_key
             self.client.head_object(Bucket=self.bucket, Key=s3_key)
             return True
         except ClientError as e:
@@ -107,6 +116,7 @@ class S3Service:
     def list_objects(self, prefix: str = "", max_keys: int = 1000) -> List[Dict[str, Any]]:
         """List objects in S3 with prefix filter."""
         try:
+            prefix = self.path_prefix + prefix
             objects = []
             paginator = self.client.get_paginator('list_objects_v2')
             
@@ -122,3 +132,8 @@ class S3Service:
             
         except ClientError as e:
             raise S3ServiceError(f"List failed: {str(e)}")
+
+    def close(self):
+        """Close S3 connectoin."""
+        if hasattr(self, 'client'):
+            self.client.close()

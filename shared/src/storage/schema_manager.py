@@ -6,11 +6,15 @@ from pymongo.database import Database
 from pymongo.errors import OperationFailure
 
 class SchemaManager:
-    def __init__(self, database: Database, schema_dir: str = "schemas"):
+    def __init__(self, database: Database, is_testing: bool = False,schema_dir: str = "schemas"):
         self.db = database
         self.schema_dir = Path(schema_dir)
         self.schemas = self._load_schemas()
         self.indexes = self._load_indexes()
+        if is_testing:
+            self.collection_prefix = "test_"
+        else:
+            self.collection_prefix = ""
     
     def _load_schemas(self):
         """Load all collection schemas from individual files"""
@@ -47,6 +51,7 @@ class SchemaManager:
         """Apply schemas and indexes for all collections"""
         for name, schema in self.schemas.items():
             try:
+                name = self.collection_prefix + name
                 self.db.run_command({
                     "collMod": name,
                     "validator": {"$jsonSchema": schema},

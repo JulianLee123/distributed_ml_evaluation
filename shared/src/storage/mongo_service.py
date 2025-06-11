@@ -15,7 +15,7 @@ class MongoServiceError(Exception):
     pass
 
 class MongoService:
-    def __init__(self, **kwargs):
+    def __init__(self, is_testing = False, **kwargs):
         """Initialize MongoDB service with config from kwargs or environment variables."""
         self.config = {
             'uri': kwargs.get('mongodb_uri') or os.getenv('MONGODB_URI'),
@@ -29,7 +29,12 @@ class MongoService:
         
         self._connect()
 
-        self.schema_manager = SchemaManager(self.db, schema_dir="schemas")
+        if is_testing:
+            self.collection_prefix = "test_"
+        else:
+            self.collection_prefix = ""
+
+        self.schema_manager = SchemaManager(self.db, is_testing = is_testing, schema_dir="schemas")
         self.schema_manager.apply_schemas()
         self.supported_collections = self.schema_manager.get_supported_collections()
 
@@ -87,10 +92,10 @@ class MongoService:
     def fetch(self, artifact_type: str, query: Dict, get_latest: bool = False) -> Optional[Dict]:
         """Fetch an artifact by the query. Gets latest version of artifact if get_latest set to True, otherwise version should be specified for versioned artifacts."""
         try:
-            if artifact_type + 's' not in self.supported_collections:
+            if self.collection_prefix + artifact_type + 's' not in self.supported_collections:
                 raise MongoServiceError(f"Unsupported artifact type: {artifact_type}")
             
-            collection = self.db[artifact_type + 's']
+            collection = self.db[self.collection_prefix + artifact_type + 's']
 
             result = None 
             if get_latest:
@@ -105,40 +110,42 @@ class MongoService:
         except PyMongoError as e:
             raise MongoServiceError(f"Fetch failed: {str(e)}")
 
-    def upload(self, artifact_type: str, query: Dict) -> str:
+    def create(self, artifact_type: str, query: Dict) -> str:
         """Upload artifact metadata to MongoDB and return document ID."""
         try:
-            if artifact_type + 's' not in self.supported_collections:
+            if self.collection_prefix + artifact_type + 's' not in self.supported_collections:
                 raise MongoServiceError(f"Unsupported artifact type: {artifact_type}")
             
-            collection = self.db[artifact_type + 's']
+            collection = self.db[self.collection_prefix + artifact_type + 's']
             result = collection.insert_one(query)
             return str(result.inserted_id)
             
         except DuplicateKeyError:
             raise MongoServiceError(f"{artifact_type} {name} v{version} already exists")
         except PyMongoError as e:
-            raise MongoServiceError(f"Upload failed: {str(e)}")
+            raise MongoServiceError(f"Create failed: {str(e)}")
 
-    def delete(self, artifact_type: str, query: Dict) -> bool:
+    def delete(self, artifact_type: str, query: Dict) -> None:
         """Delete artifact and return True if deleted, False if not found."""
         try:
-            if artifact_type + 's' not in self.supported_collections:
+            if self.collection_prefix + artifact_type + 's' not in self.supported_collections:
                 raise MongoServiceError(f"Unsupported artifact type: {artifact_type}")
             _enforce_zero_or_one_query_results(collection, query) 
-            collection = self.db[artifact_type + 's']
+            collection = self.db[self.collection_prefix + artifact_type + 's']
             result = collection.delete_one(query)
-            return result.deleted_count > 0
+            if result.deleted_count == 0: 
+                raise MongoServiceError(f"Delete failed because artifact not found: {query}")
+            return 
         except PyMongoError as e:
             raise MongoServiceError(f"Delete failed: {str(e)}")
 
     def fetch_multiple(self, artifact_type: str, query: Dict, limit: int = 50) -> List[Dict]:
         """Fetch multiple artifacts based on the query."""
         try:
-            if artifact_type + 's' not in self.supported_collections:
+            if self.collection_prefix + artifact_type + 's' not in self.supported_collections:
                 raise MongoServiceError(f"Unsupported artifact type: {artifact_type}")
 
-            collection = self.db[artifact_type + 's']
+            collection = self.db[self.collection_prefix + artifact_type + 's']
             
             results = []
             for doc in collection.find(query).limit(limit):
@@ -149,11 +156,12 @@ class MongoService:
             raise MongoServiceError(f"List failed: {str(e)}")
 
     def update(self, artifact_type: str, query: Dict, updates: Dict) -> bool:
+        """Updates artifact based on the query."""
         try:
-            if artifact_type + 's' not in self.supported_collections:
+            if self.collection_prefix + artifact_type + 's' not in self.supported_collections:
                 raise MongoServiceError(f"Unsupported artifact type: {artifact_type}")
 
-            collection = self.db[artifact_type + 's']
+            collection = self.db[self.collection_prefix + artifact_type + 's']
             _enforce_zero_or_one_query_results(collection, query) 
             updates["updated_at"] = datetime.utcnow()
             result = collection.update_one(query, {"$set": updates})
@@ -164,10 +172,10 @@ class MongoService:
     def exists(self, artifact_type: str, query: Dict) -> bool:
         """Check if artifact exists in MongoDB."""
         try:
-            if artifact_type + 's' not in self.supported_collections:
+            if self.collection_prefix + artifact_type + 's' not in self.supported_collections:
                 raise MongoServiceError(f"Unsupported artifact type: {artifact_type}")
 
-            collection = self.db[artifact_type + 's']
+            collection = self.db[self.collection_prefix + artifact_type + 's']
             return collection.count_documents(query) > 0
         except PyMongoError as e:
             raise MongoServiceError(f"Exists check failed: {str(e)}")
