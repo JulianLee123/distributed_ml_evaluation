@@ -5,10 +5,14 @@
         "model_version",
         "dataset_name",
         "dataset_version",
+        "timestamp",
         "evaluations",
         "created_by"
     ],
     "properties": {
+        "_id": {
+            "bsonType": "objectId"
+        },
         "model_name": {
             "bsonType": "string"
         },
@@ -21,6 +25,9 @@
         "dataset_version": {
             "bsonType": "string"
         },
+        "timestamp": {
+            "bsonType": "date"
+        },
         "evaluations": {
             "bsonType": "array"
         },
@@ -28,5 +35,5 @@
             "bsonType": "string"
         }
     },
-    "additionalProperties": false
+    "additionalProperties": true
 }

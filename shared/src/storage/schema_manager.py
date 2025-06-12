@@ -7,14 +7,16 @@ from pymongo.errors import OperationFailure
 
 class SchemaManager:
     def __init__(self, database: Database, is_testing: bool = False,schema_dir: str = "schemas"):
-        self.db = database
-        self.schema_dir = Path(schema_dir)
-        self.schemas = self._load_schemas()
-        self.indexes = self._load_indexes()
         if is_testing:
             self.collection_prefix = "test_"
         else:
             self.collection_prefix = ""
+        
+        self.db = database
+        script_dir = Path(__file__).parent
+        self.schema_dir = script_dir / schema_dir
+        self.schemas = self._load_schemas()
+        self.indexes = self._load_indexes()
     
     def _load_schemas(self):
         """Load all collection schemas from individual files"""
@@ -27,7 +29,7 @@ class SchemaManager:
                 schema_file = collection_dir / "schema.json"
                 if schema_file.exists():
                     with open(schema_file, 'r') as f:
-                        schemas[collection_dir.name] = json.load(f)
+                        schemas[self.collection_prefix + collection_dir.name] = json.load(f)
         return schemas
     
     def _load_indexes(self):
@@ -40,7 +42,7 @@ class SchemaManager:
                     with open(index_file, 'r') as f:
                         index_data = json.load(f)
                         # Convert to list of tuples for pymongo
-                        indexes[collection_dir.name] = [(field, direction) for field, direction in index_data["unique_index"]]
+                        indexes[self.collection_prefix + collection_dir.name] = index_data["unique_index"]
         return indexes
     
     def get_supported_collections(self):
@@ -51,8 +53,7 @@ class SchemaManager:
         """Apply schemas and indexes for all collections"""
         for name, schema in self.schemas.items():
             try:
-                name = self.collection_prefix + name
-                self.db.run_command({
+                self.db.command({
                     "collMod": name,
                     "validator": {"$jsonSchema": schema},
                     "validationAction": "error"

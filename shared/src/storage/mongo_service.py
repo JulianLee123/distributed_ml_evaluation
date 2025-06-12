@@ -9,19 +9,17 @@ from pymongo import MongoClient
 from pymongo.collection import Collection
 from pymongo.errors import DuplicateKeyError, PyMongoError
 from urllib.parse import quote_plus
-from . import SchemaManager
+from .schema_manager import SchemaManager
 
 class MongoServiceError(Exception):
     pass
 
 class MongoService:
-    def __init__(self, is_testing = False, **kwargs):
+    def __init__(self, is_testing = False, immutable_artifact_types = [], **kwargs):
         """Initialize MongoDB service with config from kwargs or environment variables."""
         self.config = {
             'uri': kwargs.get('mongodb_uri') or os.getenv('MONGODB_URI'),
             'password': kwargs.get('mongodb_password') or os.getenv('MONGODB_PASSWORD'),
-            'database': kwargs.get('database_name') or os.getenv('MONGODB_DATABASE', 'ml_evaluation'),
-            'username': kwargs.get('username') or os.getenv('MONGODB_USERNAME')
         }
         
         if not self.config['uri']:
@@ -30,11 +28,14 @@ class MongoService:
         self._connect()
 
         if is_testing:
+            self.is_testing = True
             self.collection_prefix = "test_"
         else:
+            self.is_testing = False
             self.collection_prefix = ""
 
-        self.schema_manager = SchemaManager(self.db, is_testing = is_testing, schema_dir="schemas")
+        self.immutable_artifact_types = immutable_artifact_types
+        self.schema_manager = SchemaManager(self.db, is_testing = is_testing)
         self.schema_manager.apply_schemas()
         self.supported_collections = self.schema_manager.get_supported_collections()
 
@@ -42,14 +43,10 @@ class MongoService:
         """Establish MongoDB connection with credentials and test connectivity."""
         try:
             uri = self.config['uri']
-            if self.config.get('username') and self.config.get('password'):
-                username = quote_plus(self.config['username'])
-                password = quote_plus(self.config['password'])
-                protocol, rest = uri.split('://', 1)
-                uri = f"{protocol}://{username}:{password}@{rest}"
-            
+            if self.config.get('password'):
+                uri = uri.replace('<db_password>', self.config['password'])
             self.client = MongoClient(uri, serverSelectionTimeoutMS=5000)
-            self.db = self.client[self.config['database']]
+            self.db = self.client['ModelEval']
             self.client.admin.command('ping')  # Test connection
             
         except Exception as e:
@@ -101,7 +98,7 @@ class MongoService:
             if get_latest:
                 result = self._get_latest_version(collection, query)
             else:
-                _enforce_zero_or_one_query_results(collection, query) 
+                self._enforce_zero_or_one_query_results(collection, query) 
                 result = collection.find_one(query)
                 
             if result:
@@ -130,8 +127,8 @@ class MongoService:
         try:
             if self.collection_prefix + artifact_type + 's' not in self.supported_collections:
                 raise MongoServiceError(f"Unsupported artifact type: {artifact_type}")
-            _enforce_zero_or_one_query_results(collection, query) 
             collection = self.db[self.collection_prefix + artifact_type + 's']
+            self._enforce_zero_or_one_query_results(collection, query) 
             result = collection.delete_one(query)
             if result.deleted_count == 0: 
                 raise MongoServiceError(f"Delete failed because artifact not found: {query}")
@@ -161,11 +158,15 @@ class MongoService:
             if self.collection_prefix + artifact_type + 's' not in self.supported_collections:
                 raise MongoServiceError(f"Unsupported artifact type: {artifact_type}")
 
+            if artifact_type in self.immutable_artifact_types:
+                raise MongoServiceError(f"Can't update metadata for immutable artifact type: {artifact_type}")
+
             collection = self.db[self.collection_prefix + artifact_type + 's']
-            _enforce_zero_or_one_query_results(collection, query) 
+            self._enforce_zero_or_one_query_results(collection, query) 
             updates["updated_at"] = datetime.utcnow()
             result = collection.update_one(query, {"$set": updates})
             return result.modified_count > 0
+           
         except PyMongoError as e:
             raise MongoServiceError(f"Update failed: {str(e)}")
 
@@ -182,5 +183,10 @@ class MongoService:
 
     def close(self):
         """Close MongoDB connection."""
+        if self.is_testing: 
+            self.db.drop_collection("test_models")
+            self.db.drop_collection("test_datasets")
+            self.db.drop_collection("test_predictions")
+            self.db.drop_collection("test_evaluations")
         if hasattr(self, 'client'):
             self.client.close()

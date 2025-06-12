@@ -19,7 +19,8 @@ class StorageService:
         self.artifact_types_with_upload = ['model', 'dataset', 'prediction']
         
         # Initialize services
-        self.mongo_service = MongoService(is_testing = is_testing, **kwargs)
+        artifact_type_immutable = ['model', 'dataset', 'prediction']
+        self.mongo_service = MongoService(is_testing = is_testing, immutable_artifact_types = artifact_type_immutable, **kwargs)
         self.s3_service = S3Service(is_testing = is_testing, **kwargs)
 
     def fetch(self, artifact_type: str, query: Dict, get_latest: bool = False, metadata_only: bool = True) -> Optional[Dict]:
@@ -138,9 +139,6 @@ class StorageService:
            MongoServiceError: If MongoDB service unsuccessful
        """
         # Check if artifact type is immutable
-        if artifact_type in self.artifact_type_immutable:
-            raise MongoServiceError(f"Can't update metadata for immutable artifact type: {artifact_type}")
-
         return self.mongo_service.update(artifact_type, query, updates)
 
     def close(self):
