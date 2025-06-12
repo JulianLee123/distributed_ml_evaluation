@@ -8,10 +8,10 @@ import tempfile
 import os
 import sys
 from pathlib import Path
-sys.path.append(str(Path(__file__).parent.parent / "src"))
+sys.path.append(str(Path(__file__).parent.parent))
 from dotenv import load_dotenv
 load_dotenv()
-from storage.s3_service import S3Service
+from src.storage.s3_service import S3Service
 
 
 @pytest.fixture(scope="session")

@@ -2,15 +2,8 @@
 Main storage service for ML Evaluation platform. Coordiantes s3 and mongo services.
 """
 
-import os
 from typing import Dict, Any, Optional, List
-from datetime import datetime
-from pymongo import MongoClient
-from pymongo.collection import Collection
-from pymongo.errors import DuplicateKeyError, PyMongoError
-from urllib.parse import quote_plus
-from . import SchemaManager
-from .mongo_service import MongoService, MongoServiceError
+from .mongo_service import MongoService
 from .s3_service import S3Service, S3ServiceError
 
 class StorageService:

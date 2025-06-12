@@ -4,7 +4,7 @@ MongoDB service for ML Evaluation platform.
 
 import os
 from typing import Dict, Any, Optional, List
-from datetime import datetime
+from datetime import datetime, UTC
 from pymongo import MongoClient
 from pymongo.collection import Collection
 from pymongo.errors import DuplicateKeyError, PyMongoError
@@ -163,7 +163,7 @@ class MongoService:
 
             collection = self.db[self.collection_prefix + artifact_type + 's']
             self._enforce_zero_or_one_query_results(collection, query) 
-            updates["updated_at"] = datetime.utcnow()
+            updates["updated_at"] = datetime.now(UTC)
             result = collection.update_one(query, {"$set": updates})
             return result.modified_count > 0
            

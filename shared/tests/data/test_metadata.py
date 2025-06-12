@@ -3,13 +3,13 @@ Test data fixtures for MongoDB service tests.
 Contains reusable test data objects for different artifact types.
 """
 
-from datetime import datetime
+from datetime import datetime, UTC
 from bson import Int64
 
 
 def get_current_timestamp():
     """Helper function to get current timestamp for test data."""
-    return datetime.utcnow()
+    return datetime.now(UTC)
 
 
 # Model test data

@@ -12,12 +12,12 @@ load_dotenv()
 # Add the src directory to Python path
 import sys
 from pathlib import Path
-sys.path.append(str(Path(__file__).parent.parent / "src"))
-sys.path.append(str(Path(__file__).parent.parent / "tests"))
-from storage.mongo_service import MongoService
+sys.path.append(str(Path(__file__).parent.parent))
+sys.path.append(str(Path(__file__).parent.parent))
+from src.storage.mongo_service import MongoService
 
 # Import test data from data subfolder
-from data.test_metadata import (
+from tests.data.test_metadata import (
     create_test_model,
     create_test_dataset,
     create_test_prediction,
@@ -151,6 +151,89 @@ def test_create_fetch_versioned(mongo_client):
             pass
 
 
+def test_fetch_multiple(mongo_client):
+    """Test creating multiple models for different users and fetching models for a specific user."""
+    # Create test data for multiple models
+    # Two models for test_user_1
+    user1_model1_data = create_test_model("user1_model_alpha", "1.0", "classification")
+    user1_model1_data["user_id"] = "test_user_1"  # Add user field
+    
+    user1_model2_data = create_test_model("user1_model_beta", "1.2", "regression")
+    user1_model2_data["user_id"] = "test_user_1"  # Add user field
+    
+    # One model for test_user_2
+    user2_model_data = create_test_model("user2_model_gamma", "2.0", "classification")
+    user2_model_data["user_id"] = "test_user_2"  # Add user field
+    
+    try:
+        # Create all three models
+        user1_model1_id = mongo_client.create("model", user1_model1_data)
+        user1_model2_id = mongo_client.create("model", user1_model2_data)
+        user2_model_id = mongo_client.create("model", user2_model_data)
+        
+        assert user1_model1_id is not None
+        assert user1_model2_id is not None
+        assert user2_model_id is not None
+        
+        # Use fetch_multiple to get all models for test_user_1
+        user1_query = {"user_id": "test_user_1"}
+        user1_models = mongo_client.fetch_multiple("model", user1_query)
+        
+        # Verify we got exactly 2 models for test_user_1
+        assert len(user1_models) == 2
+        
+        # Verify both models belong to test_user_1
+        user_ids = [model["user_id"] for model in user1_models]
+        assert all(user_id == "test_user_1" for user_id in user_ids)
+        
+        # Verify we got the correct model names
+        model_names = sorted([model["model_name"] for model in user1_models])
+        expected_names = sorted(["user1_model_alpha", "user1_model_beta"])
+        assert model_names == expected_names
+        
+        # Verify model details
+        alpha_model = next(m for m in user1_models if m["model_name"] == "user1_model_alpha")
+        beta_model = next(m for m in user1_models if m["model_name"] == "user1_model_beta")
+        
+        assert alpha_model["version"] == "1.0"
+        assert alpha_model["output_type"] == "classification"
+        assert "_id" in alpha_model
+        
+        assert beta_model["version"] == "1.2"
+        assert beta_model["output_type"] == "regression"
+        assert "_id" in beta_model
+        
+        # Test fetch_multiple for test_user_2 (should return 1 model)
+        user2_query = {"user_id": "test_user_2"}
+        user2_models = mongo_client.fetch_multiple("model", user2_query)
+        
+        assert len(user2_models) == 1
+        assert user2_models[0]["user_id"] == "test_user_2"
+        assert user2_models[0]["model_name"] == "user2_model_gamma"
+        assert user2_models[0]["version"] == "2.0"
+        assert user2_models[0]["output_type"] == "classification"
+        
+        # Test fetch_multiple with non-existent user (should return empty list)
+        nonexistent_query = {"user_id": "nonexistent_user"}
+        empty_results = mongo_client.fetch_multiple("model", nonexistent_query)
+        assert len(empty_results) == 0
+        assert empty_results == []
+        
+        # Test fetch_multiple with limit parameter
+        limited_results = mongo_client.fetch_multiple("model", user1_query, limit=1)
+        assert len(limited_results) == 1
+        assert limited_results[0]["user_id"] == "test_user_1"
+        
+    finally:
+        # Clean up all test artifacts
+        try:
+            mongo_client.delete("model", {"model_name": "user1_model_alpha", "version": "1.0"})
+            mongo_client.delete("model", {"model_name": "user1_model_beta", "version": "1.2"})
+            mongo_client.delete("model", {"model_name": "user2_model_gamma", "version": "2.0"})
+        except:
+            pass
+
+
 def test_create_delete(mongo_client):
     """Test creating an artifact and then deleting it."""
     # Use helper function to create test data
@@ -209,15 +292,13 @@ def test_create_update(mongo_client):
             "size": 2048
         }
         
-        # This should either return False or raise an error depending on schema validation
+        # This should raise an error
         try:
-            model_update_result = mongo_client.update("model", model_query, model_updates)
-            # If no exception is raised, the update should return False (no modifications allowed)
-            assert model_update_result is False, "Model update should fail due to schema restrictions"
+            mongo_client.update("model", model_query, model_updates)
+            assert False, "Expected schema validation error"
         except Exception as e:
-            # If an exception is raised, that's also acceptable behavior for schema validation
-            assert "additionalProperties" in str(e) or "validation" in str(e).lower(), f"Expected schema validation error, got: {e}"
-        
+            pass
+
         # Test 2: Try to update evaluation entry - should succeed
         evaluation_query = {"model_name": "update_test_model", "dataset_name": "test_dataset"}
         evaluation_updates = {
