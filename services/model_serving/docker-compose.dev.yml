@@ -1,0 +1,68 @@
+services:
+  model_serving:
+    build:
+      context: .
+      dockerfile: Dockerfile.dev
+    ports:
+      - "8000:8000"
+    environment:
+      - MONGODB_URI=${MONGODB_URI}
+      - MONGODB_PASSWORD=${MONGODB_PASSWORD}
+      - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
+      - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
+      - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
+      - S3_BUCKET=${S3_BUCKET_NAME}
+      - CHUNK_SIZE=${CHUNK_SIZE}
+      - RAY_ADDRESS=ray://:10001
+    volumes:
+      - ../../shared:/app/shared:ro
+      - ./app:/app/app:ro    
+      - ./tests:/app/tests:ro   
+    depends_on:
+      - ray-head
+    networks:
+      - ray-network
+
+  # Ray head node
+  ray-head:
+    image: rayproject/ray:latest
+    command: >
+      ray start --head 
+      --port=6379 
+      --redis-password=password 
+      --dashboard-host=0.0.0.0 
+      --dashboard-port=8265
+      --ray-client-server-port=10001
+      --num-cpus=0
+      --block
+    ports:
+      - "6380:6379"     # Redis port (mapped to avoid conflict)
+      - "8265:8265"     # Ray dashboard
+      - "10001:10001"   # Ray client server port
+    environment:
+      - RAY_DISABLE_IMPORT_WARNING=1
+    networks:
+      - ray-network
+    healthcheck:
+      test: ["CMD", "ray", "status"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  # Ray worker node (optional - you can scale this)
+  ray-worker:
+    image: rayproject/ray:latest
+    command: >
+      ray start --address=ray-head:6379 
+      --redis-password=password
+      --block
+    depends_on:
+      - ray-head
+    networks:
+      - ray-network
+    deploy:
+      replicas: 2  # You can adjust the number of workers
+
+networks:
+  ray-network:
+    driver: bridge

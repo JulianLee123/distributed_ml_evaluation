@@ -8,7 +8,6 @@ import torch
 from fastapi import HTTPException
 from typing import Dict, Any, List
 from shared.src.storage.storage_service import StorageService
-from .config import CHUNK_SIZE
 import os
 
 class DatasetService:

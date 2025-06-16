@@ -4,14 +4,12 @@ Main FastAPI application for model serving service.
 
 from fastapi import FastAPI, HTTPException
 import ray
-from ray import serve
 import numpy as np
 from datetime import datetime
 import os
 import tempfile
 import gzip
 
-from .config import RAY_ADDRESS
 from .schemas import (
     PredictionRequest, 
     PredictionResponse,
@@ -24,7 +22,7 @@ from .dataset_service import DatasetService
 from shared.src.storage.storage_service import StorageService
 
 # Initialize Ray
-ray.init(address=RAY_ADDRESS)
+ray.init()
 
 # Initialize FastAPI app
 app = FastAPI(title="ML Evaluation Model Serving Service")
