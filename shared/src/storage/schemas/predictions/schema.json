@@ -6,7 +6,6 @@
         "dataset_name",
         "dataset_version",
         "timestamp",
-        "predictions",
         "created_by"
     ],
     "properties": {
@@ -27,9 +26,6 @@
         },
         "timestamp": {
             "bsonType": "date"
-        },
-        "predictions": {
-            "bsonType": "array"
         },
         "created_by": {
             "bsonType": "string"

@@ -38,7 +38,7 @@ def test_create_fetch(mongo_client):
     # Test data for all 4 collection types
     model_data = create_test_model("fetch_test_model", "1.0", "classification")
     dataset_data = create_test_dataset("fetch_test_dataset", "1.0", 100)
-    prediction_data = create_test_prediction("fetch_test_model", "fetch_test_dataset", [1, 0, 1, 1, 0])
+    prediction_data = create_test_prediction("fetch_test_model", "fetch_test_dataset")
     evaluation_data = create_test_evaluation("fetch_test_model", "fetch_test_dataset", [{"metric_name": "accuracy", "value": 0.88}])
     
     try:
@@ -72,7 +72,6 @@ def test_create_fetch(mongo_client):
         fetched_prediction = mongo_client.fetch("prediction", prediction_query)
         assert fetched_prediction is not None
         assert fetched_prediction["model_name"] == "fetch_test_model"
-        assert fetched_prediction["predictions"] == [1, 0, 1, 1, 0]
         assert "_id" in fetched_prediction
         
         # Test Evaluation collection

@@ -14,6 +14,7 @@ class PredictionRequest(BaseModel):
     """Request model for prediction endpoint."""
     model_metadata: ModelMetadata
     dataset_metadata: DatasetMetadata
+    created_by: str
 
 class PredictionResponse(BaseModel):
     """Response model for prediction endpoint."""

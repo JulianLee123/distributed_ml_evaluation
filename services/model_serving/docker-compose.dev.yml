@@ -11,9 +11,11 @@ services:
       - AWS_ACCESS_KEY_ID=${AWS_ACCESS_KEY_ID}
       - AWS_SECRET_ACCESS_KEY=${AWS_SECRET_ACCESS_KEY}
       - AWS_DEFAULT_REGION=${AWS_DEFAULT_REGION}
-      - S3_BUCKET=${S3_BUCKET_NAME}
+      - S3_BUCKET_NAME=${S3_BUCKET_NAME}
       - CHUNK_SIZE=${CHUNK_SIZE}
-      - RAY_ADDRESS=ray://:10001
+      - DEV=TRUE
+      - RAY_ADDRESS=ray://ray-head:10001
+      - PYTHONUNBUFFERED=1
     volumes:
       - ../../shared:/app/shared:ro
       - ./app:/app/app:ro    
@@ -23,9 +25,11 @@ services:
     networks:
       - ray-network
 
-  # Ray head node
+  # Ray head node with Python 3.11
   ray-head:
-    image: rayproject/ray:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.ray-torch
     command: >
       ray start --head 
       --port=6379 
@@ -33,25 +37,22 @@ services:
       --dashboard-host=0.0.0.0 
       --dashboard-port=8265
       --ray-client-server-port=10001
-      --num-cpus=0
+      --num-cpus=1
       --block
     ports:
-      - "6380:6379"     # Redis port (mapped to avoid conflict)
+      - "6379:6379"     # Redis port
       - "8265:8265"     # Ray dashboard
       - "10001:10001"   # Ray client server port
     environment:
       - RAY_DISABLE_IMPORT_WARNING=1
     networks:
       - ray-network
-    healthcheck:
-      test: ["CMD", "ray", "status"]
-      interval: 30s
-      timeout: 10s
-      retries: 3
 
-  # Ray worker node (optional - you can scale this)
+  # Ray worker node with Python 3.11
   ray-worker:
-    image: rayproject/ray:latest
+    build:
+      context: .
+      dockerfile: Dockerfile.ray-torch
     command: >
       ray start --address=ray-head:6379 
       --redis-password=password
@@ -61,7 +62,7 @@ services:
     networks:
       - ray-network
     deploy:
-      replicas: 2  # You can adjust the number of workers
+      replicas: 2 
 
 networks:
   ray-network:

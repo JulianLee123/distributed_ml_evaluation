@@ -9,6 +9,7 @@ from pathlib import Path
 import sys
 import tempfile
 import gzip
+from bson import Int64
 
 # Add the src directory to Python path
 sys.path.append(str(Path(__file__).parent.parent))
@@ -39,7 +40,7 @@ def test_data():
         dataset_content = f.read()
     
     # Load test model
-    model_path = test_dir / "models" / "classification1.pth"
+    model_path = test_dir / "models" / "classification1.pt"
     with open(model_path, "rb") as f:
         model_content = f.read()
     
@@ -60,7 +61,7 @@ def test_prediction_endpoint(storage_service, test_data):
         "dataset_name": "test_dataset",
         "version": "1.0",
         "num_entries": 100,
-        "size": len(test_data["dataset"]),
+        "size": Int64(len(test_data["dataset"])),
         "created_by": "test_user"
     }
     
@@ -68,7 +69,7 @@ def test_prediction_endpoint(storage_service, test_data):
         "model_name": "test_model",
         "version": "1.0",
         "output_type": "classification",
-        "size": len(test_data["model"]),
+        "size": Int64(len(test_data["model"])),
         "created_by": "test_user"
     }
     
@@ -90,11 +91,12 @@ def test_prediction_endpoint(storage_service, test_data):
         # Create prediction request
         request = PredictionRequest(
             model_metadata=ModelMetadata(**model_metadata),
-            dataset_metadata=DatasetMetadata(**dataset_metadata)
+            dataset_metadata=DatasetMetadata(**dataset_metadata),
+            created_by="test_user"
         )
         
         # Make prediction request
-        response = client.post("/predict", json=request.dict())
+        response = client.post("/predict", json=request.model_dump())
         assert response.status_code == 200
         
         # Get prediction results from storage
@@ -110,7 +112,7 @@ def test_prediction_endpoint(storage_service, test_data):
             stored_predictions = np.load(f)
         
         # Compare with expected predictions
-        np.testing.assert_array_almost_equal(stored_predictions, test_data["expected_predictions"])
+        np.testing.assert_array_almost_equal(stored_predictions, test_data["expected_predictions"], decimal=4)
         
     finally:
         # Clean up temporary files

@@ -1,0 +1,11 @@
+# Dockerfile.ray-torch
+FROM rayproject/ray:latest-py311
+
+# Install PyTorch and ML dependencies
+RUN pip install --no-cache-dir torch torchvision numpy scipy scikit-learn pandas
+
+# Copy model service code
+COPY app/ /app/
+
+# Set working directory
+WORKDIR /app

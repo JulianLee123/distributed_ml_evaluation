@@ -5,16 +5,15 @@ Main FastAPI application for model serving service.
 from fastapi import FastAPI, HTTPException
 import ray
 import numpy as np
-from datetime import datetime
 import os
 import tempfile
 import gzip
+import torch
+import io
 
 from .schemas import (
     PredictionRequest, 
     PredictionResponse,
-    ModelMetadata,
-    DatasetMetadata,
     PredictionMetadata
 )
 from .model_service import ModelService
@@ -28,14 +27,22 @@ ray.init()
 app = FastAPI(title="ML Evaluation Model Serving Service")
 
 # Initialize services
-storage_service = StorageService()
+if os.getenv("DEV") == "TRUE":
+    storage_service = StorageService(is_testing=True)
+else:
+    storage_service = StorageService()
 model_service = ModelService(storage_service)
 dataset_service = DatasetService(storage_service)
 
 @ray.remote
-def predict_batch(model, data_chunk):
-    """erform predictions on a batch of data using Ray for parallel processing."""
-    return model_service.predict(model, torch.tensor(data_chunk)).numpy()
+def predict_batch(model_bytes, data_chunk):
+    """Perform predictions on a batch of data using Ray for parallel processing."""
+    # model = model_service.load_model_from_local(model_path)
+    #return model_service.predict(model, torch.tensor(data_chunk)).numpy()
+    model = torch.jit.load(io.BytesIO(model_bytes), map_location='cpu')
+    model.eval()
+    with torch.no_grad():
+        return model(torch.tensor(data_chunk, dtype=torch.float32)).numpy()
 
 @app.post("/predict", response_model=PredictionResponse)
 async def predict(request: PredictionRequest):
@@ -53,29 +60,31 @@ async def predict(request: PredictionRequest):
     """
     try:
         # Load dataset and model
-        dataset = dataset_service.load_dataset(request.dataset_metadata.dict())
-        model = model_service.load_model(request.model_metadata.dict())
+        dataset = dataset_service.load_dataset(request.dataset_metadata.model_dump())
+        model_path = model_service.retreive_model_from_storage(request.model_metadata.model_dump())
 
         # Preprocess data and create chunks
         processed_data = dataset_service.preprocess_data(dataset)
         chunks = dataset_service.create_chunks(processed_data)
 
         # Use Ray to make predictions in parallel on chunks
-        prediction_futures = [predict_batch.remote(model, chunk) for chunk in chunks]
+        with open(model_path, 'rb') as f:
+            model_bytes = f.read()
+        model_bytes_ref = ray.put(model_bytes)
+        prediction_futures = [predict_batch.remote(model_bytes_ref, chunk) for chunk in chunks]
         predictions = ray.get(prediction_futures)
-
+        os.unlink(model_path)
         # Flatten the predictions
         all_predictions = np.concatenate(predictions, axis=0)
-        
+
         # Create prediction metadata
         prediction_metadata = PredictionMetadata(
             model_name=request.model_metadata.model_name,
             model_version=request.model_metadata.version,
             dataset_name=request.dataset_metadata.dataset_name,
             dataset_version=request.dataset_metadata.version,
-            timestamp=datetime.utcnow(),
             num_predictions=len(all_predictions),
-            created_by=os.getenv("SERVICE_USER", "model_serving_service")
+            created_by=request.created_by
         )
         
         # Save predictions to a temporary .npy.gz file
@@ -91,7 +100,6 @@ async def predict(request: PredictionRequest):
                 "model_version": prediction_metadata.model_version,
                 "dataset_name": prediction_metadata.dataset_name,
                 "dataset_version": prediction_metadata.dataset_version,
-                "timestamp": prediction_metadata.timestamp,
                 "num_predictions": prediction_metadata.num_predictions,
                 "created_by": prediction_metadata.created_by
             }

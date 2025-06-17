@@ -29,7 +29,7 @@ class CustomDataset(Dataset):
         self.data = pd.read_csv(csv_file)
         feature_cols = [col for col in self.data.columns if col.startswith('feature_')]
         self.features = self.data[feature_cols].values.astype(np.float32)
-        self.labels = self.data['class'].values.astype(np.int64)
+        self.labels = self.data['output'].values.astype(np.int64)
     
     def __len__(self):
         return len(self.data)

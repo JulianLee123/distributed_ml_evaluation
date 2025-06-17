@@ -39,7 +39,6 @@ TEST_PREDICTION = {
     "dataset_name": "test_dataset",
     "dataset_version": "1.0",
     "timestamp": get_current_timestamp(),
-    "predictions": [1, 2, 1, 1, 1],  # Fixed syntax error: was "predictions"; should be "predictions":
     "created_by": "test_user"
 }
 
@@ -80,16 +79,13 @@ def create_test_dataset(dataset_name="test_dataset", version="1.0", num_entries=
     return data
 
 
-def create_test_prediction(model_name="test_model", dataset_name="test_dataset", predictions=None):
-    """Create a test prediction with custom parameters."""
-    if predictions is None:
-        predictions = [1, 2, 1, 1, 1]
+def create_test_prediction(model_name="test_model", dataset_name="test_dataset"):
+    """Create a test prediction."""
     
     data = TEST_PREDICTION.copy()
     data.update({
         "model_name": model_name,
         "dataset_name": dataset_name,
-        "predictions": predictions,
         "timestamp": get_current_timestamp()
     })
     return data

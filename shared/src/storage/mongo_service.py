@@ -114,6 +114,7 @@ class MongoService:
                 raise MongoServiceError(f"Unsupported artifact type: {artifact_type}")
             
             collection = self.db[self.collection_prefix + artifact_type + 's']
+            query["timestamp"] = datetime.now(UTC)
             result = collection.insert_one(query)
             return str(result.inserted_id)
             
@@ -163,7 +164,7 @@ class MongoService:
 
             collection = self.db[self.collection_prefix + artifact_type + 's']
             self._enforce_zero_or_one_query_results(collection, query) 
-            updates["updated_at"] = datetime.now(UTC)
+            updates["timestamp"] = datetime.now(UTC)
             result = collection.update_one(query, {"$set": updates})
             return result.modified_count > 0
            

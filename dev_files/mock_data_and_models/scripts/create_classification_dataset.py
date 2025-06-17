@@ -91,7 +91,7 @@ def save_dataset(features, labels, output_path, train_pct, val_pct, random_seed)
         data_dict[f'feature_{i}'] = features[:, i]
     
     # Add class labels
-    data_dict['class'] = labels
+    data_dict['output'] = labels
     
     # Convert to DataFrame and split into train/val/test sets
     df = pd.DataFrame(data_dict)

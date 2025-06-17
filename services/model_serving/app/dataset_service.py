@@ -40,8 +40,9 @@ class DatasetService:
 
     def preprocess_data(self, data: pd.DataFrame) -> np.ndarray:
         """Preprocess the dataset for model input. """
+        data = data.drop(columns=["output"])
         return data.values
 
     def create_chunks(self, data: np.ndarray) -> List[np.ndarray]:
         """Split data into chunks for batch processing."""
-        return [data[i:i+CHUNK_SIZE] for i in range(0, len(data), CHUNK_SIZE)] 
+        return [data[i:i+int(os.getenv("CHUNK_SIZE"))] for i in range(0, len(data), int(os.getenv("CHUNK_SIZE")))] 

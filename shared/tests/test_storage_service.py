@@ -40,7 +40,8 @@ def test_create_fetch(storage_client):
          tempfile.NamedTemporaryFile(suffix='.csv', delete=False) as dataset_file:
         
         # Write some dummy content
-        model_file.write(b"dummy model content")
+        dummy_model_content = "dummy model content"
+        model_file.write(dummy_model_content.encode('utf-8'))
         dataset_file.write(b"dummy dataset content")
         model_path = model_file.name
         dataset_path = dataset_file.name
@@ -49,7 +50,7 @@ def test_create_fetch(storage_client):
         # Test data for all 4 collection types
         model_data = create_test_model("fetch_test_model", "1.0", "classification")
         dataset_data = create_test_dataset("fetch_test_dataset", "1.0", 100)
-        prediction_data = create_test_prediction("fetch_test_model", "fetch_test_dataset", [1, 0, 1, 1, 0])
+        prediction_data = create_test_prediction("fetch_test_model", "fetch_test_dataset")
         evaluation_data = create_test_evaluation("fetch_test_model", "fetch_test_dataset", [{"metric_name": "accuracy", "value": 0.88}])
         
         # Test Model collection
@@ -61,7 +62,8 @@ def test_create_fetch(storage_client):
         assert fetched_model["output_type"] == "classification"
         assert "_id" in fetched_model
         assert "download_path" in fetched_model
-        
+        with open(fetched_model["download_path"], 'r') as f:
+            assert f.read() == dummy_model_content
         # Test Dataset collection
         storage_client.create("dataset", dataset_data, object_path=dataset_path)
         dataset_query = {"dataset_name": "fetch_test_dataset", "version": "1.0"}
@@ -71,6 +73,7 @@ def test_create_fetch(storage_client):
         assert fetched_dataset["num_entries"] == 100
         assert "_id" in fetched_dataset
         assert "download_path" in fetched_dataset
+
         
         # Test Prediction collection
         storage_client.create("prediction", prediction_data)
@@ -78,7 +81,6 @@ def test_create_fetch(storage_client):
         fetched_prediction = storage_client.fetch("prediction", prediction_query)
         assert fetched_prediction is not None
         assert fetched_prediction["model_name"] == "fetch_test_model"
-        assert fetched_prediction["predictions"] == [1, 0, 1, 1, 0]
         assert "_id" in fetched_prediction
         
         # Test Evaluation collection

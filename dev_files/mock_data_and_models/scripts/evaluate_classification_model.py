@@ -32,7 +32,7 @@ class CustomDataset(Dataset):
     - Converting data to appropriate PyTorch tensors
     """
     
-    def __init__(self, csv_file, has_labels=True):
+    def __init__(self, csv_file):
         """
         Initialize the dataset.
         
@@ -41,16 +41,12 @@ class CustomDataset(Dataset):
             has_labels (bool): Whether the dataset contains labels (default: True)
         """
         self.data = pd.read_csv(csv_file)
-        self.has_labels = has_labels
         
         # Extract feature columns (all columns starting with 'feature_')
         feature_cols = [col for col in self.data.columns if col.startswith('feature_')]
         self.features = self.data[feature_cols].values.astype(np.float32)
         
-        if self.has_labels:
-            self.labels = self.data['class'].values.astype(np.int64)
-        else:
-            self.labels = None
+        self.labels = self.data['output'].values.astype(np.int64)
     
     def __len__(self):
         """Return the total number of samples in the dataset."""
@@ -58,10 +54,7 @@ class CustomDataset(Dataset):
     
     def __getitem__(self, idx):
         """Return a single sample (features and label) at the given index."""
-        if self.has_labels:
-            return torch.tensor(self.features[idx]), torch.tensor(self.labels[idx])
-        else:
-            return torch.tensor(self.features[idx]), torch.tensor(-1)  # Dummy label
+        return torch.tensor(self.features[idx]), torch.tensor(self.labels[idx])
 
 def evaluate_model(model, test_loader):
     """
@@ -127,8 +120,7 @@ def main():
     
     # Check if dataset has labels
     test_data = pd.read_csv(args.test_csv)
-    has_labels = 'class' in test_data.columns
-    test_dataset = CustomDataset(args.test_csv, has_labels=has_labels)
+    test_dataset = CustomDataset(args.test_csv)
     
     # Determine input size from data
     input_size = test_dataset.features.shape[1]
@@ -158,8 +150,8 @@ def main():
     # Evaluate model and get raw predictions
     raw_predictions = evaluate_model(model, test_loader)
     
-    # Save raw predictions as the output tensor
-    torch.save(raw_predictions, args.output_path)
+    # Save raw predictions
+    np.save(args.output_path, raw_predictions)
     print(f"Saved raw model predictions to {args.output_path}")
     
     print(f"\nEvaluation complete! Raw predictions saved to {args.output_path}")
