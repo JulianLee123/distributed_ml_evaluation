@@ -29,6 +29,7 @@ class DatasetMetadata(BaseModel):
     version: str
     num_entries: int
     size: int
+    output_column: str
     created_by: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
 
@@ -61,7 +62,7 @@ class EvaluationMetadata(BaseModel):
     dataset_name: str
     dataset_version: str
     timestamp: datetime = Field(default_factory=datetime.utcnow)
-    evaluations: List[Dict[str, Any]]
+    evaluations: Dict[str, Any]
     created_by: str
 
     @field_serializer('timestamp')

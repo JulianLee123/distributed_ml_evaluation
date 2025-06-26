@@ -28,7 +28,8 @@ TEST_DATASET = {
     "version": "1.0",
     "timestamp": get_current_timestamp(),
     "num_entries": 5,
-    "size": Int64(1024), 
+    "size": Int64(1024),
+    "output_column": "target",
     "created_by": "test_user"
 }
 
@@ -49,7 +50,7 @@ TEST_EVALUATION = {
     "dataset_name": "test_dataset",
     "dataset_version": "1.0",
     "timestamp": get_current_timestamp(),
-    "evaluations": [{"metric_name": "accuracy", "value": 0.95}],
+    "evaluations": {"accuracy": 0.95, "precision": 0.92, "recall": 0.88},
     "created_by": "test_user"
 }
 
@@ -67,13 +68,14 @@ def create_test_model(model_name="test_model", version="1.0", output_type="class
     return data
 
 
-def create_test_dataset(dataset_name="test_dataset", version="1.0", num_entries=5):
+def create_test_dataset(dataset_name="test_dataset", version="1.0", num_entries=5, output_column="target"):
     """Create a test dataset with custom parameters."""
     data = TEST_DATASET.copy()
     data.update({
         "dataset_name": dataset_name,
         "version": version,
         "num_entries": num_entries,
+        "output_column": output_column,
         "timestamp": get_current_timestamp()
     })
     return data
@@ -94,7 +96,7 @@ def create_test_prediction(model_name="test_model", dataset_name="test_dataset")
 def create_test_evaluation(model_name="test_model", dataset_name="test_dataset", evaluations=None):
     """Create a test evaluation with custom parameters."""
     if evaluations is None:
-        evaluations = [{"metric_name": "accuracy", "value": 0.95}]
+        evaluations = {"accuracy": 0.95, "precision": 0.92, "recall": 0.88}
     
     data = TEST_EVALUATION.copy()
     data.update({

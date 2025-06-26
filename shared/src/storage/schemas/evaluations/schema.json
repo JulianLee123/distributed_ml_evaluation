@@ -29,7 +29,7 @@
             "bsonType": "date"
         },
         "evaluations": {
-            "bsonType": "array"
+            "bsonType": "object"
         },
         "created_by": {
             "bsonType": "string"

@@ -49,9 +49,9 @@ def test_create_fetch(storage_client):
     try:
         # Test data for all 4 collection types
         model_data = create_test_model("fetch_test_model", "1.0", "classification")
-        dataset_data = create_test_dataset("fetch_test_dataset", "1.0", 100)
+        dataset_data = create_test_dataset("fetch_test_dataset", "1.0", 100, "target")
         prediction_data = create_test_prediction("fetch_test_model", "fetch_test_dataset")
-        evaluation_data = create_test_evaluation("fetch_test_model", "fetch_test_dataset", [{"metric_name": "accuracy", "value": 0.88}])
+        evaluation_data = create_test_evaluation("fetch_test_model", "fetch_test_dataset", {"accuracy": 0.88, "precision": 0.85})
         
         # Test Model collection
         storage_client.create("model", model_data, object_path=model_path)
@@ -71,6 +71,7 @@ def test_create_fetch(storage_client):
         assert fetched_dataset is not None
         assert fetched_dataset["dataset_name"] == "fetch_test_dataset"
         assert fetched_dataset["num_entries"] == 100
+        assert fetched_dataset["output_column"] == "target"
         assert "_id" in fetched_dataset
         assert "download_path" in fetched_dataset
 
@@ -89,8 +90,8 @@ def test_create_fetch(storage_client):
         fetched_evaluation = storage_client.fetch("evaluation", evaluation_query)
         assert fetched_evaluation is not None
         assert fetched_evaluation["model_name"] == "fetch_test_model"
-        assert fetched_evaluation["evaluations"][0]["metric_name"] == "accuracy"
-        assert fetched_evaluation["evaluations"][0]["value"] == 0.88
+        assert fetched_evaluation["evaluations"]["accuracy"] == 0.88
+        assert fetched_evaluation["evaluations"]["precision"] == 0.85
         assert "_id" in fetched_evaluation
         
     finally:
@@ -120,8 +121,8 @@ def test_create_delete_with_metadata(storage_client):
 
     try:
         # Create test data
-        dataset1_data = create_test_dataset("delete_test_dataset1", "1.0", 100)
-        dataset2_data = create_test_dataset("delete_test_dataset2", "1.0", 200)
+        dataset1_data = create_test_dataset("delete_test_dataset1", "1.0", 100, "target")
+        dataset2_data = create_test_dataset("delete_test_dataset2", "1.0", 200, "label")
         
         # Create both datasets
         storage_client.create("dataset", dataset1_data, object_path=dataset1_path)
@@ -158,9 +159,9 @@ def test_create_delete_without_metadata(storage_client):
     try:
         # Create test data
         evaluation1_data = create_test_evaluation("delete_test_model1", "delete_test_dataset1", 
-                                                [{"metric_name": "accuracy", "value": 0.85}])
+                                                {"accuracy": 0.85, "precision": 0.82})
         evaluation2_data = create_test_evaluation("delete_test_model2", "delete_test_dataset2", 
-                                                [{"metric_name": "precision", "value": 0.92}])
+                                                {"precision": 0.92, "recall": 0.89})
         
         # Create both evaluations
         storage_client.create("evaluation", evaluation1_data)
@@ -204,8 +205,8 @@ def test_fetch_multiple_metadata(storage_client):
 
     try:
         # Create test data for multiple datasets
-        dataset1_data = create_test_dataset("multi_test_dataset1", "1.0", 100)
-        dataset2_data = create_test_dataset("multi_test_dataset2", "1.0", 200)
+        dataset1_data = create_test_dataset("multi_test_dataset1", "1.0", 100, "target")
+        dataset2_data = create_test_dataset("multi_test_dataset2", "1.0", 200, "label")
         
         # Add user field to both datasets
         dataset1_data["user_id"] = "test_user_1"
@@ -251,9 +252,9 @@ def test_update_metadata(storage_client):
     """Test updating metadata for mutable and immutable artifacts."""
     try:
         # Create test data
-        dataset_data = create_test_dataset("update_test_dataset", "1.0", 100)
+        dataset_data = create_test_dataset("update_test_dataset", "1.0", 100, "target")
         evaluation_data = create_test_evaluation("update_test_model", "update_test_dataset", 
-                                               [{"metric_name": "accuracy", "value": 0.75}])
+                                               {"accuracy": 0.75, "precision": 0.72})
         
         # Create both artifacts
         storage_client.create("dataset", dataset_data)
@@ -276,10 +277,11 @@ def test_update_metadata(storage_client):
         # Test 2: Try to update evaluation entry - should succeed
         evaluation_query = {"model_name": "update_test_model", "dataset_name": "update_test_dataset"}
         evaluation_updates = {
-            "evaluations": [
-                {"metric_name": "accuracy", "value": 0.92},
-                {"metric_name": "precision", "value": 0.89}
-            ]
+            "evaluations": {
+                "accuracy": 0.92,
+                "precision": 0.89,
+                "recall": 0.87
+            }
         }
         
         evaluation_update_result = storage_client.update_metadata("evaluation", evaluation_query, evaluation_updates)
@@ -287,12 +289,10 @@ def test_update_metadata(storage_client):
         
         # Verify the evaluation was actually updated
         updated_evaluation = storage_client.fetch("evaluation", evaluation_query)
-        assert len(updated_evaluation["evaluations"]) == 2
-        assert updated_evaluation["evaluations"][0]["metric_name"] == "accuracy"
-        assert updated_evaluation["evaluations"][0]["value"] == 0.92
-        assert updated_evaluation["evaluations"][1]["metric_name"] == "precision"
-        assert updated_evaluation["evaluations"][1]["value"] == 0.89
-        assert "updated_at" in updated_evaluation
+        assert len(updated_evaluation["evaluations"]) == 3
+        assert updated_evaluation["evaluations"]["accuracy"] == 0.92
+        assert updated_evaluation["evaluations"]["precision"] == 0.89
+        assert updated_evaluation["evaluations"]["recall"] == 0.87
         
         # Verify the dataset was NOT updated
         unchanged_dataset = storage_client.fetch("dataset", dataset_query)

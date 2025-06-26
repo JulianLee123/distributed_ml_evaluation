@@ -15,6 +15,7 @@ services:
       - CHUNK_SIZE=${CHUNK_SIZE}
       - DEV=TRUE
       - RAY_ADDRESS=ray://ray-head:10001
+      - RAY_NUM_ACTORS=4
       - PYTHONUNBUFFERED=1
     volumes:
       - ../../shared:/app/shared:ro

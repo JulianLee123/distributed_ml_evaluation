@@ -58,15 +58,16 @@ def test_prediction_endpoint(storage_service, test_data):
     """Test the prediction endpoint with test data."""
     # First, upload test dataset and model to storage
     dataset_metadata = {
-        "dataset_name": "test_dataset",
+        "dataset_name": "classification1_test",
         "version": "1.0",
         "num_entries": 100,
         "size": Int64(len(test_data["dataset"])),
+        "output_column": "target",
         "created_by": "test_user"
     }
     
     model_metadata = {
-        "model_name": "test_model",
+        "model_name": "classification1",
         "version": "1.0",
         "output_type": "classification",
         "size": Int64(len(test_data["model"])),
@@ -96,13 +97,13 @@ def test_prediction_endpoint(storage_service, test_data):
         )
         
         # Make prediction request
-        response = client.post("/predict", json=request.model_dump())
+        response = client.post("/predict", json=request.dict())
         assert response.status_code == 200
         
         # Get prediction results from storage
         prediction_query = {
-            "model_name": "test_model",
-            "dataset_name": "test_dataset"
+            "model_name": "classification1",
+            "dataset_name": "classification1_test"
         }
         prediction_result = storage_service.fetch("prediction", prediction_query, metadata_only=False)
         assert prediction_result is not None
@@ -120,9 +121,9 @@ def test_prediction_endpoint(storage_service, test_data):
         os.unlink(model_path)
         
         # Clean up test data from storage
-        storage_service.delete("dataset", {"dataset_name": "test_dataset", "version": "1.0"})
-        storage_service.delete("model", {"model_name": "test_model", "version": "1.0"})
-        storage_service.delete("prediction", {"model_name": "test_model", "dataset_name": "test_dataset"})
+        storage_service.delete("dataset", {"dataset_name": "classification1_test", "version": "1.0"})
+        storage_service.delete("model", {"model_name": "classification1", "version": "1.0"})
+        storage_service.delete("prediction", {"model_name": "classification1", "dataset_name": "classification1_test"})
 
 if __name__ == '__main__':
     pytest.main([__file__, '-v'])

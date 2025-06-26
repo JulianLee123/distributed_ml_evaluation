@@ -39,7 +39,7 @@ def test_create_fetch(mongo_client):
     model_data = create_test_model("fetch_test_model", "1.0", "classification")
     dataset_data = create_test_dataset("fetch_test_dataset", "1.0", 100)
     prediction_data = create_test_prediction("fetch_test_model", "fetch_test_dataset")
-    evaluation_data = create_test_evaluation("fetch_test_model", "fetch_test_dataset", [{"metric_name": "accuracy", "value": 0.88}])
+    evaluation_data = create_test_evaluation("fetch_test_model", "fetch_test_dataset", {"accuracy": 0.88})
     
     try:
         # Test Model collection
@@ -82,8 +82,7 @@ def test_create_fetch(mongo_client):
         fetched_evaluation = mongo_client.fetch("evaluation", evaluation_query)
         assert fetched_evaluation is not None
         assert fetched_evaluation["model_name"] == "fetch_test_model"
-        assert fetched_evaluation["evaluations"][0]["metric_name"] == "accuracy"
-        assert fetched_evaluation["evaluations"][0]["value"] == 0.88
+        assert fetched_evaluation["evaluations"]["accuracy"] == 0.88
         assert "_id" in fetched_evaluation
         
     finally:
@@ -275,7 +274,7 @@ def test_create_update(mongo_client):
     """Test creating artifacts and then updating them - model should fail, evaluation should succeed."""
     # Test data for both model and evaluation
     model_data = create_test_model("update_test_model", "1.0", "classification")
-    evaluation_data = create_test_evaluation("update_test_model", "test_dataset", [{"metric_name": "accuracy", "value": 0.75}])
+    evaluation_data = create_test_evaluation("update_test_model", "test_dataset", { "accuracy": 0.75})
     
     try:
         # Create both artifacts
@@ -301,10 +300,10 @@ def test_create_update(mongo_client):
         # Test 2: Try to update evaluation entry - should succeed
         evaluation_query = {"model_name": "update_test_model", "dataset_name": "test_dataset"}
         evaluation_updates = {
-            "evaluations": [
-                {"metric_name": "accuracy", "value": 0.92},
-                {"metric_name": "precision", "value": 0.89}
-            ]
+            "evaluations": {
+                "accuracy": 0.92,
+                "precision": 0.89
+            }
         }
         
         evaluation_update_result = mongo_client.update("evaluation", evaluation_query, evaluation_updates)
@@ -312,12 +311,8 @@ def test_create_update(mongo_client):
         
         # Verify the evaluation was actually updated
         updated_evaluation = mongo_client.fetch("evaluation", evaluation_query)
-        assert len(updated_evaluation["evaluations"]) == 2
-        assert updated_evaluation["evaluations"][0]["metric_name"] == "accuracy"
-        assert updated_evaluation["evaluations"][0]["value"] == 0.92
-        assert updated_evaluation["evaluations"][1]["metric_name"] == "precision"
-        assert updated_evaluation["evaluations"][1]["value"] == 0.89
-        assert "updated_at" in updated_evaluation
+        assert updated_evaluation["evaluations"]["accuracy"] == 0.92
+        assert updated_evaluation["evaluations"]["precision"] == 0.89
         
         # Verify the model was NOT updated
         unchanged_model = mongo_client.fetch("model", model_query)

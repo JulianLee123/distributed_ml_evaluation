@@ -8,15 +8,13 @@ import numpy as np
 import os
 import tempfile
 import gzip
-import torch
-import io
 
 from .schemas import (
     PredictionRequest, 
     PredictionResponse,
     PredictionMetadata
 )
-from .model_service import ModelService
+from .model_actor import ModelActor
 from .dataset_service import DatasetService
 from shared.src.storage.storage_service import StorageService
 
@@ -31,18 +29,10 @@ if os.getenv("DEV") == "TRUE":
     storage_service = StorageService(is_testing=True)
 else:
     storage_service = StorageService()
-model_service = ModelService(storage_service)
 dataset_service = DatasetService(storage_service)
 
-@ray.remote
-def predict_batch(model_bytes, data_chunk):
-    """Perform predictions on a batch of data using Ray for parallel processing."""
-    # model = model_service.load_model_from_local(model_path)
-    #return model_service.predict(model, torch.tensor(data_chunk)).numpy()
-    model = torch.jit.load(io.BytesIO(model_bytes), map_location='cpu')
-    model.eval()
-    with torch.no_grad():
-        return model(torch.tensor(data_chunk, dtype=torch.float32)).numpy()
+# Initialize Ray actors pool
+actor_pool = [ModelActor.remote() for _ in range(int(os.getenv("RAY_NUM_ACTORS")))]
 
 @app.post("/predict", response_model=PredictionResponse)
 async def predict(request: PredictionRequest):
@@ -59,21 +49,40 @@ async def predict(request: PredictionRequest):
         HTTPException: If prediction fails
     """
     try:
-        # Load dataset and model
+        # Load and preprocess dataset
         dataset = dataset_service.load_dataset(request.dataset_metadata.model_dump())
-        model_path = model_service.retreive_model_from_storage(request.model_metadata.model_dump())
-
-        # Preprocess data and create chunks
         processed_data = dataset_service.preprocess_data(dataset)
         chunks = dataset_service.create_chunks(processed_data)
 
-        # Use Ray to make predictions in parallel on chunks
+        # Load model
+        model_metadata = request.model_metadata.model_dump()
+        model_query = {
+            "model_name": model_metadata["model_name"],
+            "version": model_metadata["version"]
+        }
+        model_data = storage_service.fetch("model", model_query, metadata_only=False)
+
+        if not model_data or "download_path" not in model_data:
+            raise HTTPException(status_code=404, detail="Model not found")
+        
+        model_path = model_data["download_path"]
+
+        # Load model bytes and create unique model ID
         with open(model_path, 'rb') as f:
             model_bytes = f.read()
+        model_id = f"{request.model_metadata.model_name}_{request.model_metadata.version}"
         model_bytes_ref = ray.put(model_bytes)
-        prediction_futures = [predict_batch.remote(model_bytes_ref, chunk) for chunk in chunks]
+        
+        # Distribute predictions across actor pool
+        prediction_futures = []
+        for i, chunk in enumerate(chunks):
+            actor = actor_pool[i % len(actor_pool)]
+            future = actor.predict.remote(model_bytes_ref, model_id, chunk)
+            prediction_futures.append(future)
+        
         predictions = ray.get(prediction_futures)
         os.unlink(model_path)
+        
         # Flatten the predictions
         all_predictions = np.concatenate(predictions, axis=0)
 
